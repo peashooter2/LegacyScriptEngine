@@ -295,18 +295,6 @@ void EnableEventListener(int eventId) {
             IF_LISTENED_END(EVENT_TYPES::afterPlaceBlock);
         });
         break;
-        // Deprecated
-        /*case EVENT_TYPES::onMove:
-            Event::PlayerMoveEvent::subscribe([](const PlayerMoveEvent& ev) {
-                IF_LISTENED(EVENT_TYPES::onMove) {
-                    CallEvent(EVENT_TYPES::onMove,
-           PlayerClass::newPlayer(ev.mPlayer), FloatPos::newPos(ev.mPos,
-           ev.mPlayer->getDimensionId()));
-                }
-                IF_LISTENED_END(EVENT_TYPES::onMove);
-            });
-            break;*/
-
     case EVENT_TYPES::onJump:
         bus.emplaceListener<PlayerJumpEvent>([](PlayerJumpEvent& ev) {
             IF_LISTENED(EVENT_TYPES::onJump) {
@@ -432,18 +420,9 @@ void EnableEventListener(int eventId) {
         lse::events::PlayerOpenContainerScreenEvent();
         break;
 
-        // case EVENT_TYPES::onSetArmor:
-        //   Event::PlayerSetArmorEvent::subscribe([](const PlayerSetArmorEvent &ev)
-        //   {
-        //     IF_LISTENED(EVENT_TYPES::onSetArmor) {
-        //       CallEvent(EVENT_TYPES::onSetArmor,
-        //       PlayerClass::newPlayer(ev.mPlayer),
-        //                 Number::newNumber(ev.mSlot),
-        //                 ItemClass::newItem(ev.mArmorItem));
-        //     }
-        //     IF_LISTENED_END(EVENT_TYPES::onSetArmor);
-        //   });
-        //   break;
+    case EVENT_TYPES::onSetArmor:
+        lse::events::PlayerSetArmorEvent();
+        break;
 
     case EVENT_TYPES::onEat:
         bus.emplaceListener<PlayerUseItemEvent>([](PlayerUseItemEvent& ev) {
@@ -467,16 +446,9 @@ void EnableEventListener(int eventId) {
         lse::events::PlayerEatEvent();
         break;
 
-        // case EVENT_TYPES::onConsumeTotem:
-        //   Event::PlayerConsumeTotemEvent::subscribe(
-        //       [](const PlayerConsumeTotemEvent &ev) {
-        //         IF_LISTENED(EVENT_TYPES::onConsumeTotem) {
-        //           CallEvent(EVENT_TYPES::onConsumeTotem,
-        //                     PlayerClass::newPlayer(ev.mPlayer));
-        //         }
-        //         IF_LISTENED_END(EVENT_TYPES::onConsumeTotem);
-        //       });
-        //   break;
+    case EVENT_TYPES::onConsumeTotem:
+        lse::events::PlayerConsumeTotemEvent();
+        break;
 
         // case EVENT_TYPES::onEffectAdded:
         // case EVENT_TYPES::onEffectRemoved:
@@ -611,17 +583,9 @@ void EnableEventListener(int eventId) {
         lse::events::ProjectileCreatedEvent();
         break;
 
-        // case EVENT_TYPES::onProjectileHitEntity:
-        //   Event::ProjectileHitEntityEvent::subscribe(
-        //       [](const ProjectileHitEntityEvent &ev) {
-        //         IF_LISTENED(EVENT_TYPES::onProjectileHitEntity) {
-        //           CallEvent(EVENT_TYPES::onProjectileHitEntity,
-        //                     EntityClass::newEntity(ev.mTarget),
-        //                     EntityClass::newEntity(ev.mSource));
-        //         }
-        //         IF_LISTENED_END(EVENT_TYPES::onProjectileHitEntity);
-        //       });
-        //   break;
+    case EVENT_TYPES::onProjectileHitEntity:
+        lse::events::ProjectileHitEntityEvent();
+        break;
 
         // case EVENT_TYPES::onEntityTransformation:
         //   Event::EntityTransformEvent::subscribe([](const EntityTransformEvent
@@ -635,17 +599,9 @@ void EnableEventListener(int eventId) {
         //   });
         //   break;
 
-        // case EVENT_TYPES::onProjectileHitBlock:
-        //   Event::ProjectileHitBlockEvent::subscribe(
-        //       [](const ProjectileHitBlockEvent &ev) {
-        //         IF_LISTENED(EVENT_TYPES::onProjectileHitBlock) {
-        //           CallEvent(EVENT_TYPES::onProjectileHitBlock,
-        //                     BlockClass::newBlock(ev.mBlockInstance),
-        //                     EntityClass::newEntity(ev.mSource));
-        //         }
-        //         IF_LISTENED_END(EVENT_TYPES::onProjectileHitBlock);
-        //       });
-        //   break;
+    case EVENT_TYPES::onProjectileHitBlock:
+        lse::events::ProjectileHitBlockEvent();
+        break;
 
     case EVENT_TYPES::onLiquidFlow:
         lse::events::LiquidFlowEvent();

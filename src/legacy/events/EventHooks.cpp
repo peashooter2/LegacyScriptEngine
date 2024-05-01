@@ -11,12 +11,15 @@
 #include "mc/server/commands/CommandOrigin.h"
 #include "mc/server/commands/CommandOriginType.h"
 #include "mc/world/ActorUniqueID.h"
+#include "mc/world/containers/ContainerID.h"
+#include "mc/world/inventory/transaction/InventorySource.h"
 #include "mc/world/scores/ScoreInfo.h"
 
 #include <ll/api/memory/Hook.h>
 #include <ll/api/memory/Memory.h>
 #include <mc/common/wrapper/InteractionResult.h>
 #include <mc/entity/WeakEntityRef.h>
+#include <mc/entity/components/ProjectileComponent.h>
 #include <mc/entity/utilities/ActorType.h>
 #include <mc/server/module/VanillaServerGameplayEventListener.h>
 #include <mc/world/actor/ActorDefinitionIdentifier.h>
@@ -27,6 +30,7 @@
 #include <mc/world/actor/player/Player.h>
 #include <mc/world/containers/models/LevelContainerModel.h>
 #include <mc/world/events/EventResult.h>
+#include <mc/world/inventory/transaction/ComplexInventoryTransaction.h>
 #include <mc/world/item/BucketItem.h>
 #include <mc/world/item/CrossbowItem.h>
 #include <mc/world/item/ItemInstance.h>
@@ -68,21 +72,22 @@ LL_TYPE_INSTANCE_HOOK(
     void,
     Player&         player,
     BlockPos const& blockPos,
+    Block const&    block,
     uchar           unk_char
 ) {
     IF_LISTENED(EVENT_TYPES::onStartDestroyBlock) {
         CallEventVoid(
             EVENT_TYPES::onStartDestroyBlock,
             PlayerClass::newPlayer(&player),
-            BlockClass::newBlock(blockPos, player.getDimensionId())
+            BlockClass::newBlock(&block, &blockPos, player.getDimensionId())
         );
     }
     IF_LISTENED_END(EVENT_TYPES::onStartDestroyBlock)
-    origin(player, blockPos, unk_char);
+    origin(player, blockPos, block, unk_char);
 }
 
 LL_TYPE_INSTANCE_HOOK(
-    PlayerDropItemHook,
+    PlayerDropItemHook1,
     HookPriority::Normal,
     Player,
     "?drop@Player@@UEAA_NAEBVItemStack@@_N@Z",
@@ -100,6 +105,33 @@ LL_TYPE_INSTANCE_HOOK(
     }
     IF_LISTENED_END(EVENT_TYPES::onDropItem);
     return origin(item, randomly);
+}
+
+LL_TYPE_INSTANCE_HOOK(
+    PlayerDropItemHook2,
+    HookPriority::Normal,
+    ComplexInventoryTransaction,
+    "?handle@ComplexInventoryTransaction@@UEBA?AW4InventoryTransactionError@@AEAVPlayer@@_N@Z",
+    InventoryTransactionError,
+    Player& player,
+    bool    isSenderAuthority
+) {
+    if (type == ComplexInventoryTransaction::Type::NormalTransaction) {
+        IF_LISTENED(EVENT_TYPES::onDropItem) {
+            InventorySource source(InventorySourceType::ContainerInventory, ContainerID::Inventory);
+            auto&           actions = data.getActions(source);
+            if (actions.size() == 1) {
+                CallEventRtnValue(
+                    EVENT_TYPES::onDropItem,
+                    InventoryTransactionError::NoError,
+                    PlayerClass::newPlayer(&player),
+                    ItemClass::newItem(&const_cast<ItemStack&>(player.getInventory().getItem(actions[0].mSlot)), false)
+                );
+            }
+        }
+        IF_LISTENED_END(EVENT_TYPES::onDropItem);
+    }
+    return origin(player, isSenderAuthority);
 }
 
 LL_TYPE_INSTANCE_HOOK(
@@ -935,8 +967,81 @@ LL_TYPE_INSTANCE_HOOK(
 //     return origin(instance, entity, pos, face, clickPos);
 // }
 
+LL_TYPE_INSTANCE_HOOK(PlayerConsumeTotemHook, HookPriority::Normal, Player, "?consumeTotem@Player@@UEAA_NXZ", bool) {
+    IF_LISTENED(EVENT_TYPES::onConsumeTotem) {
+        CallEventRtnValue(EVENT_TYPES::onConsumeTotem, false, PlayerClass::newPlayer(this));
+    }
+    IF_LISTENED_END(EVENT_TYPES::onConsumeTotem);
+    return origin();
+}
+
+LL_TYPE_INSTANCE_HOOK(
+    PlayerSetArmorHook,
+    HookPriority::Normal,
+    ServerPlayer,
+    "?setArmor@ServerPlayer@@UEAAXW4ArmorSlot@@AEBVItemStack@@@Z",
+    void,
+    ArmorSlot        armorSlot,
+    ItemStack const& item
+) {
+    IF_LISTENED(EVENT_TYPES::onSetArmor) {
+        CallEventVoid(
+            EVENT_TYPES::onSetArmor,
+            PlayerClass::newPlayer(this),
+            Number::newNumber((int)armorSlot),
+            ItemClass::newItem(&const_cast<ItemStack&>(item), false)
+        );
+    }
+    IF_LISTENED_END(EVENT_TYPES::onSetArmor);
+    origin(std::move(armorSlot), item);
+}
+
+LL_TYPE_INSTANCE_HOOK(
+    ProjectileHitEntityHook,
+    HookPriority::Normal,
+    ProjectileComponent,
+    &ProjectileComponent::onHit,
+    void,
+    Actor&           owner,
+    HitResult const& res
+) {
+    IF_LISTENED(EVENT_TYPES::onProjectileHitEntity) {
+        CallEventVoid(
+            EVENT_TYPES::onProjectileHitEntity,
+            EntityClass::newEntity(res.getEntity()),
+            EntityClass::newEntity(&owner)
+        );
+    }
+    IF_LISTENED_END(EVENT_TYPES::onProjectileHitEntity);
+    origin(owner, res);
+}
+
+LL_TYPE_INSTANCE_HOOK(
+    ProjectileHitBlockHook,
+    HookPriority::Normal,
+    Block,
+    &Block::onProjectileHit,
+    void,
+    BlockSource&    region,
+    BlockPos const& pos,
+    Actor const&    projectile
+) {
+    IF_LISTENED(EVENT_TYPES::onProjectileHitBlock) {
+        CallEventVoid(
+            EVENT_TYPES::onProjectileHitBlock,
+            BlockClass::newBlock(this, &pos, &region),
+            EntityClass::newEntity(&const_cast<Actor&>(projectile))
+        );
+    }
+    IF_LISTENED_END(EVENT_TYPES::onProjectileHitBlock);
+    origin(region, pos, projectile);
+}
+
 void PlayerStartDestroyBlock() { PlayerStartDestroyHook::hook(); }
-void PlayerDropItem() { PlayerDropItemHook::hook(); }
+void PlayerDropItem() {
+    PlayerDropItemHook1::hook();
+    PlayerDropItemHook2::hook();
+}
 void PlayerOpenContainerEvent() { PlayerOpenContainerHook::hook(); }
 void PlayerCloseContainerEvent() {
     PlayerCloseContainerHook1::hook();
@@ -984,6 +1089,10 @@ void PlayerUseBucketTakeEvent() {
     PlayerUseBucketTakeHook1::hook();
     PlayerUseBucketTakeHook2::hook();
 }
+void PlayerConsumeTotemEvent() { PlayerConsumeTotemHook::hook(); }
+void PlayerSetArmorEvent() { PlayerSetArmorHook::hook(); }
+void ProjectileHitEntityEvent() { ProjectileHitEntityHook::hook(); }
+void ProjectileHitBlockEvent() { ProjectileHitBlockHook::hook(); }
 
 // NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
 // NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)

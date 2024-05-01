@@ -26,6 +26,7 @@
 #include "mc/deps/json/JsonHelpers.h"
 #include "mc/enums/CurrentCmdVersion.h"
 #include "mc/locale/I18n.h"
+#include "mc/locale/Localization.h"
 #include "mc/server/ServerLevel.h"
 #include "mc/server/commands/BlockStateCommandParam.h"
 #include "mc/server/commands/CommandBlockName.h"
@@ -173,7 +174,10 @@ Local<Value> McClass::runcmd(const Arguments& args) {
     CommandContext context = CommandContext(
         args[0].asString().toString(),
         std::make_unique<ServerCommandOrigin>(
-            ServerCommandOrigin("Server", ll::service::getLevel()->asServer(), CommandPermissionLevel::Internal, 0)
+            "Server",
+            ll::service::getLevel()->asServer(),
+            CommandPermissionLevel::Owner,
+            0
         )
     );
     try {
@@ -185,29 +189,34 @@ Local<Value> McClass::runcmd(const Arguments& args) {
 Local<Value> McClass::runcmdEx(const Arguments& args) {
     CHECK_ARGS_COUNT(args, 1)
     CHECK_ARG_TYPE(args[0], ValueKind::kString)
-    auto origin =
-        ServerCommandOrigin("Server", ll::service::getLevel()->asServer(), CommandPermissionLevel::Internal, 0);
-    auto command = ll::service::getMinecraft()->getCommands().compileCommand(
-        args[0].asString().toString(),
-        origin,
-        (CurrentCmdVersion)CommandVersion::CurrentVersion,
-        [](std::string const& err) {}
-    );
-    CommandOutput output(CommandOutputType::AllOutput);
-    std::string   outputStr;
-    Local<Object> resObj = Object::newObject();
     try {
+        std::string outputStr;
+        auto        origin =
+            ServerCommandOrigin("Server", ll::service::getLevel()->asServer(), CommandPermissionLevel::Owner, 0);
+        auto command = ll::service::getMinecraft()->getCommands().compileCommand(
+            args[0].asString().toString(),
+            origin,
+            (CurrentCmdVersion)CommandVersion::CurrentVersion,
+            [&](std::string const& err) { outputStr.append(err).append("\n"); }
+        );
+        Local<Object> resObj = Object::newObject();
         if (command) {
+            CommandOutput output(CommandOutputType::AllOutput);
             command->run(origin, output);
-            for (auto msg : output.getMessages()) {
-                outputStr = outputStr.append(I18n::get(msg.getMessageId(), msg.getParams())).append("\n");
+            static std::shared_ptr<Localization> localization =
+                getI18n().getLocaleFor(getI18n().getCurrentLanguage()->getFullLanguageCode());
+            for (auto& msg : output.getMessages()) {
+                outputStr += getI18n().get(msg.getMessageId(), msg.getParams(), localization).append("\n");
             }
-            if (output.getMessages().size()) {
+            if (outputStr.ends_with('\n')) {
                 outputStr.pop_back();
             }
             resObj.set("success", output.getSuccessCount() ? true : false);
             resObj.set("output", outputStr);
             return resObj;
+        }
+        if (outputStr.ends_with('\n')) {
+            outputStr.pop_back();
         }
         resObj.set("success", false);
         return resObj;

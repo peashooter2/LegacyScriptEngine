@@ -5,6 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.3] - 2024-05-01
+
+### Fixed
+
+- Fix getRespawnPosition [#115]
+- Fix onDropItem [#110]
+
+## [0.7.2] - 2024-04-29
+
+### Fixed
+
+- Fix output of runcmdEx not integrity
+
+## [0.7.1] - 2024-04-29
+
+### Changed
+
+- Disable unload in node engine
+
+### Fixed
+
+- Fix PluginManager's error
+
+## [0.7.0] - 2024-04-28
+
+### Changed
+
+- Adapt to LeviLamina 0.12.x
+
+## [0.6.4] - 2024-04-21
+
+### Fixed
+
+- Fix NetworkAPI's callback
+- Enlarge NewProcess's buffer [#48]
+
+## [0.6.3] - 2024-04-20
+
+### Added
+
+- Add onConsumeTotem [#104]
+- Add onSetArmor [#95]
+- Add onProjectileHitEntity & onProjectileHitBlock [#87]
+
+### Changed
+
+- Set snbt format to ForceQuote in toSNBT
+
+### Fixed
+
+- Fix NetworkPacket [#50]
+
 ## [0.6.2] - 2024-04-14
 
 ### Fixed
@@ -252,7 +304,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#44]: https://github.com/LiteLDev/LegacyScriptEngine/issues/44
 [#45]: https://github.com/LiteLDev/LegacyScriptEngine/issues/45
 [#47]: https://github.com/LiteLDev/LegacyScriptEngine/issues/47
+[#48]: https://github.com/LiteLDev/LegacyScriptEngine/issues/48
 [#49]: https://github.com/LiteLDev/LegacyScriptEngine/issues/49
+[#50]: https://github.com/LiteLDev/LegacyScriptEngine/issues/50
 [#52]: https://github.com/LiteLDev/LegacyScriptEngine/issues/52
 [#53]: https://github.com/LiteLDev/LegacyScriptEngine/issues/53
 [#54]: https://github.com/LiteLDev/LegacyScriptEngine/issues/54
@@ -266,15 +320,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#80]: https://github.com/LiteLDev/LegacyScriptEngine/issues/80
 [#81]: https://github.com/LiteLDev/LegacyScriptEngine/issues/81
 [#82]: https://github.com/LiteLDev/LegacyScriptEngine/issues/82
+[#87]: https://github.com/LiteLDev/LegacyScriptEngine/issues/87
 [#91]: https://github.com/LiteLDev/LegacyScriptEngine/issues/91
 [#92]: https://github.com/LiteLDev/LegacyScriptEngine/issues/92
 [#94]: https://github.com/LiteLDev/LegacyScriptEngine/issues/94
+[#95]: https://github.com/LiteLDev/LegacyScriptEngine/issues/95
 [#97]: https://github.com/LiteLDev/LegacyScriptEngine/issues/97
 [#99]: https://github.com/LiteLDev/LegacyScriptEngine/issues/99
 [#100]: https://github.com/LiteLDev/LegacyScriptEngine/issues/100
 [#101]: https://github.com/LiteLDev/LegacyScriptEngine/issues/101
 [#102]: https://github.com/LiteLDev/LegacyScriptEngine/issues/102
+[#104]: https://github.com/LiteLDev/LegacyScriptEngine/issues/104
+[#110]: https://github.com/LiteLDev/LegacyScriptEngine/issues/110
+[#115]: https://github.com/LiteLDev/LegacyScriptEngine/issues/115
 
+[0.7.3]: https://github.com/LiteLDev/LegacyScriptEngine/compare/v0.7.2...v0.7.3
+[0.7.2]: https://github.com/LiteLDev/LegacyScriptEngine/compare/v0.7.1...v0.7.2
+[0.7.1]: https://github.com/LiteLDev/LegacyScriptEngine/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/LiteLDev/LegacyScriptEngine/compare/v0.6.4...v0.7.0
+[0.6.4]: https://github.com/LiteLDev/LegacyScriptEngine/compare/v0.6.3...v0.6.4
+[0.6.3]: https://github.com/LiteLDev/LegacyScriptEngine/compare/v0.6.2...v0.6.3
 [0.6.2]: https://github.com/LiteLDev/LegacyScriptEngine/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/LiteLDev/LegacyScriptEngine/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/LiteLDev/LegacyScriptEngine/compare/v0.5.4...v0.6.0
