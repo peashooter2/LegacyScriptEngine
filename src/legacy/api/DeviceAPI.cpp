@@ -40,9 +40,9 @@ Local<Object> DeviceClass::newDevice(Player* p) {
 
 // 成员函数
 void DeviceClass::setPlayer(Player* player) {
-    __try {
+    try {
         id = player->getOrCreateUniqueID();
-    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    } catch (...) {
         isValid = false;
     }
 }

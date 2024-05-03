@@ -276,7 +276,8 @@ void EnableEventListener(int eventId) {
                 CallEvent(
                     EVENT_TYPES::onPlaceBlock,
                     PlayerClass::newPlayer(&ev.self()),
-                    BlockClass::newBlock(ev.pos(), ev.self().getDimensionId())
+                    BlockClass::newBlock(truePos, ev.self().getDimensionId()),
+                    Number::newNumber((schar)ev.face())
                 );
             }
             IF_LISTENED_END(EVENT_TYPES::onPlaceBlock);
@@ -561,7 +562,9 @@ void EnableEventListener(int eventId) {
                 Actor* source = nullptr;
                 if (ev.source().isEntitySource()) {
                     source = ll::service::getLevel()->fetchEntity(ev.source().getDamagingEntityUniqueID());
-                    if (ev.source().isChildEntitySource()) source = source->getOwner();
+                    if (source) {
+                        if (ev.source().isChildEntitySource()) source = source->getOwner();
+                    }
                 }
 
                 CallEventUncancelable(
@@ -636,30 +639,13 @@ void EnableEventListener(int eventId) {
         lse::events::PistonPushEvent();
         break;
 
-        // case EVENT_TYPES::onHopperSearchItem:
-        //   Event::HopperSearchItemEvent::subscribe(
-        //       [](const HopperSearchItemEvent &ev) {
-        //         IF_LISTENED(EVENT_TYPES::onHopperSearchItem) {
-        //           CallEvent(EVENT_TYPES::onHopperSearchItem,
-        //                     FloatPos::newPos(ev.mPos, ev.mDimensionId),
-        //                     Boolean::newBoolean(ev.isMinecart),
-        //                     ItemClass::newItem(ev.mItemStack));
-        //         }
-        //         IF_LISTENED_END(EVENT_TYPES::onHopperSearchItem);
-        //       });
-        //   break;
+    case EVENT_TYPES::onHopperSearchItem:
+        lse::events::HopperEvent(true);
+        break;
 
-        // case EVENT_TYPES::onHopperPushOut:
-        //   Event::HopperPushOutEvent::subscribe([](const HopperPushOutEvent &ev) {
-        //     IF_LISTENED(EVENT_TYPES::onHopperPushOut) {
-        //       CallEvent(EVENT_TYPES::onHopperPushOut,
-        //                 FloatPos::newPos(ev.mPos, ev.mDimensionId),
-        //                 Boolean::newBoolean(ev.isMinecart),
-        //                 ItemClass::newItem(ev.mItemStack));
-        //     }
-        //     IF_LISTENED_END(EVENT_TYPES::onHopperPushOut);
-        //   });
-        //   break;
+    case EVENT_TYPES::onHopperPushOut:
+        lse::events::HopperEvent(false);
+        break;
 
     case EVENT_TYPES::onFireSpread:
         bus.emplaceListener<FireSpreadEvent>([](FireSpreadEvent& ev) {

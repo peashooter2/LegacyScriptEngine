@@ -648,9 +648,9 @@ Local<Value> McClass::broadcast(const Arguments& args) {
 
 // 成员函数
 void PlayerClass::set(Player* player) {
-    __try {
+    try {
         id = player->getOrCreateUniqueID();
-    } __except (EXCEPTION_EXECUTE_HANDLER) {
+    } catch (...) {
         isValid = false;
     }
 }
