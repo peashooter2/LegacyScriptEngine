@@ -3,6 +3,7 @@
 #include "api/APIHelp.h"
 #include "engine/EngineManager.h"
 #include "engine/TimeTaskSystem.h"
+#include "httplib.h"
 #include "ll/api/chrono/GameChrono.h"
 #include "ll/api/schedule/Scheduler.h"
 #include "ll/api/schedule/Task.h"
@@ -20,12 +21,15 @@ ll::schedule::GameTickScheduler WSScheduler;
 // stacktrace
 #define CATCH_CALLBACK(LOG)                                                                                            \
     catch (const Exception& e) {                                                                                       \
+        EngineScope enter(engine);                                                                                     \
         lse::getSelfPluginInstance().getLogger().error(LOG);                                                           \
+        PrintException(e);                                                                                             \
         return;                                                                                                        \
     }                                                                                                                  \
     catch (...) {                                                                                                      \
         lse::getSelfPluginInstance().getLogger().error(LOG);                                                           \
         ll::error_utils::printCurrentException(lse::getSelfPluginInstance().getLogger());                              \
+        EngineScope enter(engine);                                                                                     \
         LOG_ERROR_WITH_SCRIPT_INFO();                                                                                  \
         return;                                                                                                        \
     }
@@ -420,6 +424,8 @@ Local<Value> WSClientClass::errorCode(const Arguments& args) {
 
 using namespace httplib;
 
+ll::thread::TickSyncTaskPool taskPool;
+
 #define ADD_CALLBACK(METHOD, path, func)                                                                               \
     callbacks.emplace(make_pair(                                                                                       \
         path,                                                                                                          \
@@ -431,32 +437,34 @@ using namespace httplib;
         }                                                                                                              \
     ));                                                                                                                \
     svr->METHOD(path.c_str(), [this, engine = EngineScope::currentEngine()](const Request& req, Response& resp) {      \
-        if ((ll::getServerStatus() != ll::ServerStatus::Running) || !EngineManager::isValid(engine)                    \
+        if ((ll::getServerStatus() == ll::ServerStatus::Stopping) || !EngineManager::isValid(engine)                   \
             || engine->isDestroying())                                                                                 \
             return;                                                                                                    \
-        WSScheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(1), [this, engine, req, &resp] {                    \
-            try {                                                                                                      \
-                if ((ll::getServerStatus() != ll::ServerStatus::Running) || !EngineManager::isValid(engine)            \
-                    || engine->isDestroying())                                                                         \
-                    return;                                                                                            \
-                EngineScope enter(engine);                                                                             \
-                for (auto& [k, v] : this->callbacks) {                                                                 \
-                    if (v.type != HttpRequestType::METHOD) return;                                                     \
-                    std::regex  rgx(k);                                                                                \
-                    std::smatch matches;                                                                               \
-                    if (std::regex_match(req.path, matches, rgx)) {                                                    \
-                        if (matches == req.matches) {                                                                  \
-                            auto reqObj  = new HttpRequestClass(req);                                                  \
-                            auto respObj = new HttpResponseClass(resp);                                                \
-                            v.func.get().call({}, reqObj, respObj);                                                    \
-                            resp = *respObj->get();                                                                    \
-                            break;                                                                                     \
+        taskPool                                                                                                       \
+            .addTask([this, engine, req, &resp] {                                                                      \
+                try {                                                                                                  \
+                    if ((ll::getServerStatus() == ll::ServerStatus::Stopping) || !EngineManager::isValid(engine)       \
+                        || engine->isDestroying())                                                                     \
+                        return;                                                                                        \
+                    EngineScope enter(engine);                                                                         \
+                    for (auto& [k, v] : this->callbacks) {                                                             \
+                        if (v.type != HttpRequestType::METHOD) return;                                                 \
+                        std::regex  rgx(k);                                                                            \
+                        std::smatch matches;                                                                           \
+                        if (std::regex_match(req.path, matches, rgx)) {                                                \
+                            if (matches == req.matches) {                                                              \
+                                auto reqObj  = new HttpRequestClass(req);                                              \
+                                auto respObj = new HttpResponseClass(resp);                                            \
+                                v.func.get().call({}, reqObj, respObj);                                                \
+                                resp = *respObj->get();                                                                \
+                                break;                                                                                 \
+                            }                                                                                          \
                         }                                                                                              \
                     }                                                                                                  \
                 }                                                                                                      \
-            }                                                                                                          \
-            CATCH_CALLBACK("Fail in NetworkAPI callback")                                                              \
-        });                                                                                                            \
+                CATCH_CALLBACK("Fail in NetworkAPI callback")                                                          \
+            })                                                                                                         \
+            .wait();                                                                                                   \
     });
 
 HttpServerClass::HttpServerClass(const Local<Object>& scriptObj) : ScriptClass(scriptObj), svr(new Server) {}
@@ -561,22 +569,24 @@ Local<Value> HttpServerClass::onPreRouting(const Arguments& args) {
                 || engine->isDestroying())
                 return Server::HandlerResponse::Unhandled;
             bool handled = false;
-            WSScheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(1), [this, engine, req, &resp, &handled] {
-                try {
-                    if ((ll::getServerStatus() != ll::ServerStatus::Running) || !EngineManager::isValid(engine)
-                        || engine->isDestroying())
-                        return;
-                    EngineScope enter(engine);
-                    auto        reqObj  = new HttpRequestClass(req);
-                    auto        respObj = new HttpResponseClass(resp);
-                    auto        res     = this->preRoutingCallback.func.get().call({}, reqObj, respObj);
-                    if (res.isBoolean() && res.asBoolean().value() == false) {
-                        handled = true;
+            taskPool
+                .addTask([this, engine, req, &resp, &handled] {
+                    try {
+                        if ((ll::getServerStatus() != ll::ServerStatus::Running) || !EngineManager::isValid(engine)
+                            || engine->isDestroying())
+                            return;
+                        EngineScope enter(engine);
+                        auto        reqObj  = new HttpRequestClass(req);
+                        auto        respObj = new HttpResponseClass(resp);
+                        auto        res     = this->preRoutingCallback.func.get().call({}, reqObj, respObj);
+                        if (res.isBoolean() && res.asBoolean().value() == false) {
+                            handled = true;
+                        }
+                        resp = *respObj->get();
                     }
-                    resp = *respObj->get();
-                }
-                CATCH_CALLBACK("Fail in onPreRouting");
-            });
+                    CATCH_CALLBACK("Fail in onPreRouting");
+                })
+                .wait();
             return handled ? Server::HandlerResponse::Handled : Server::HandlerResponse::Unhandled;
         });
         return this->getScriptObject();
@@ -595,16 +605,18 @@ Local<Value> HttpServerClass::onPostRouting(const Arguments& args) {
             if ((ll::getServerStatus() != ll::ServerStatus::Running) || !EngineManager::isValid(engine)
                 || engine->isDestroying())
                 return;
-            WSScheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(1), [this, engine, req, &resp] {
-                if ((ll::getServerStatus() != ll::ServerStatus::Running) || !EngineManager::isValid(engine)
-                    || engine->isDestroying())
-                    return;
-                EngineScope enter(engine);
-                auto        reqObj  = new HttpRequestClass(req);
-                auto        respObj = new HttpResponseClass(resp);
-                this->postRoutingCallback.func.get().call({}, reqObj, respObj);
-                resp = *respObj->get();
-            });
+            taskPool
+                .addTask([this, engine, req, &resp] {
+                    if ((ll::getServerStatus() != ll::ServerStatus::Running) || !EngineManager::isValid(engine)
+                        || engine->isDestroying())
+                        return;
+                    EngineScope enter(engine);
+                    auto        reqObj  = new HttpRequestClass(req);
+                    auto        respObj = new HttpResponseClass(resp);
+                    this->postRoutingCallback.func.get().call({}, reqObj, respObj);
+                    resp = *respObj->get();
+                })
+                .wait();
         });
         return this->getScriptObject();
     }
@@ -621,7 +633,7 @@ Local<Value> HttpServerClass::onError(const Arguments& args) {
             if ((ll::getServerStatus() != ll::ServerStatus::Running) || !EngineManager::isValid(engine)
                 || engine->isDestroying())
                 return;
-            WSScheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(1), [this, engine, req, &resp] {
+            taskPool.addTask([this, engine, req, &resp] {
                 if ((ll::getServerStatus() != ll::ServerStatus::Running) || !EngineManager::isValid(engine)
                     || engine->isDestroying())
                     return;
@@ -648,22 +660,24 @@ Local<Value> HttpServerClass::onException(const Arguments& args) {
                 if ((ll::getServerStatus() != ll::ServerStatus::Running) || !EngineManager::isValid(engine)
                     || engine->isDestroying())
                     return;
-                WSScheduler.add<ll::schedule::DelayTask>(ll::chrono::ticks(1), [this, engine, req, &resp, e] {
-                    if ((ll::getServerStatus() != ll::ServerStatus::Running) || !EngineManager::isValid(engine)
-                        || engine->isDestroying())
-                        return;
-                    EngineScope enter(engine);
-                    auto        reqObj  = new HttpRequestClass(req);
-                    auto        respObj = new HttpResponseClass(resp);
-                    try {
-                        if (e) {
-                            std::rethrow_exception(e);
+                taskPool
+                    .addTask([this, engine, req, &resp, e] {
+                        if ((ll::getServerStatus() != ll::ServerStatus::Running) || !EngineManager::isValid(engine)
+                            || engine->isDestroying())
+                            return;
+                        EngineScope enter(engine);
+                        auto        reqObj  = new HttpRequestClass(req);
+                        auto        respObj = new HttpResponseClass(resp);
+                        try {
+                            if (e) {
+                                std::rethrow_exception(e);
+                            }
+                        } catch (const std::exception& exp) {
+                            this->exceptionCallback.func.get().call({}, reqObj, respObj, String::newString(exp.what()));
                         }
-                    } catch (const std::exception& exp) {
-                        this->exceptionCallback.func.get().call({}, reqObj, respObj, String::newString(exp.what()));
-                    }
-                    resp = *respObj->get();
-                });
+                        resp = *respObj->get();
+                    })
+                    .wait();
             }
         );
         return this->getScriptObject();
@@ -683,8 +697,8 @@ Local<Value> HttpServerClass::listen(const Arguments& args) {
     }
 
     try {
-        string addr = "127.0.0.1";
-        int    port = 80;
+        std::string addr = "127.0.0.1";
+        int         port = 80;
         if (args.size() == 2) {
             addr = args[0].toStr();
             port = args[1].asNumber().toInt32();
@@ -694,11 +708,15 @@ Local<Value> HttpServerClass::listen(const Arguments& args) {
         if (port < 0 || port > 65535) {
             throw script::Exception("Invalid port number! (0~65535)");
         }
-
         RecordOperation(ENGINE_OWN_DATA()->pluginName, "StartHttpServer", fmt::format("on {}:{}", addr, port));
-
-        std::thread th([this](string addr, int port) { svr->listen(addr.c_str(), port); }, addr, port);
-        th.detach();
+        std::thread([this, addr, port]() {
+            try {
+                svr->stop();
+                svr->listen(addr, port);
+            } catch (...) {
+                ll::error_utils::printCurrentException(lse::getSelfPluginInstance().getLogger());
+            }
+        }).detach();
         return this->getScriptObject(); // return self
     }
     CATCH("Fail in listen!");

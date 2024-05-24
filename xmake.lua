@@ -9,15 +9,16 @@ add_requires(
     "legacymoney 0.7.0",
     "legacyparticleapi 0.7.0",
     "legacyremotecall 0.7.0",
-    "levilamina 0.12.2",
+    "levilamina 0.12.3",
     "lightwebsocketclient",
     "magic_enum",
     "nlohmann_json",
     "simpleini",
     "sqlite3 3.43.0+200",
     "toml++",
-    "cpp-httplib 0.14.0", {configs={ssl=true, zlib=true}}
+    "openssl3 3.0.7"
 )
+add_requires("cpp-httplib 0.15.3", {configs={ssl=true, zlib=true}})
 
 if is_config("backend", "lua") then
     add_requires("scriptx main", {configs={backend="Lua"}})

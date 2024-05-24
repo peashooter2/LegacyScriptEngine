@@ -86,9 +86,13 @@ auto migratePlugin(const PluginManager& pluginManager, const std::filesystem::pa
     };
 #endif
 #ifdef LEGACY_SCRIPT_ENGINE_BACKEND_NODEJS
-    lse::legacy::UncompressFile(path.string(), pluginDir.string(), 30000);
+    lse::legacy::UncompressFile(
+        ll::string_utils::u8str2str(path.u8string()),
+        ll::string_utils::u8str2str(pluginDir.u8string()),
+        30000
+    );
     ll::plugin::Manifest manifest{
-        .entry = NodeJsHelper::findEntryScript(path.string()),
+        .entry = NodeJsHelper::findEntryScript(ll::string_utils::u8str2str(path.u8string())),
         .name  = ll::string_utils::u8str2str(pluginFileBaseName.u8string()),
         .type  = pluginType,
         .dependencies =
@@ -99,11 +103,12 @@ auto migratePlugin(const PluginManager& pluginManager, const std::filesystem::pa
     };
     std::filesystem::remove(path);
 #endif
+    if (!std::filesystem::exists(pluginDir / "manifest.json")) {
+        auto manifestJson = ll::reflection::serialize<nlohmann::ordered_json>(manifest).value();
 
-    auto manifestJson = ll::reflection::serialize<nlohmann::ordered_json>(manifest).value();
-
-    std::ofstream manifestFile{pluginDir / "manifest.json"};
-    manifestFile << manifestJson.dump(4);
+        std::ofstream manifestFile{pluginDir / "manifest.json"};
+        manifestFile << manifestJson.dump(4);
+    }
 }
 
 } // namespace
